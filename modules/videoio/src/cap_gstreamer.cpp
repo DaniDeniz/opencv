@@ -167,6 +167,7 @@ private:
     bool          isPosFramesEmulated;
     gint64        emulatedFrameNumber;
     bool          isOutputByteBuffer;
+    int           bits;
 
 public:
     GStreamerCapture();
@@ -205,7 +206,8 @@ GStreamerCapture::GStreamerCapture() :
     isPosFramesSupported(false),
     isPosFramesEmulated(false),
     emulatedFrameNumber(-1),
-    isOutputByteBuffer(false)
+    isOutputByteBuffer(false),
+    bits(8)
 {
 }
 
@@ -284,9 +286,14 @@ bool GStreamerCapture::retrieveFrame(int, OutputArray dst)
     {
         Mat src;
         if (isOutputByteBuffer)
+        {
             src = Mat(Size(info.size, 1), CV_8UC1, info.data);
-        else
+        }else if(bits==16){
+            src = Mat(sz, CV_16UC1, info.data);
+        }else
+        {
             src = Mat(sz, CV_MAKETYPE(CV_8U, channels), info.data);
+        }
         CV_Assert(src.isContinuous());
         src.copyTo(dst);
     }
@@ -316,7 +323,7 @@ bool GStreamerCapture::determineFrameDims(Size &sz)
     if (!name)
         return false;
 
-    // we support 11 types of data:
+    // we support 12 types of data:
     //     video/x-raw, format=BGR   -> 8bit, 3 channels
     //     video/x-raw, format=GRAY8 -> 8bit, 1 channel
     //     video/x-raw, format=UYVY  -> 8bit, 2 channel
@@ -326,6 +333,7 @@ bool GStreamerCapture::determineFrameDims(Size &sz)
     //     video/x-raw, format=NV21  -> 8bit, 1 channel (height is 1.5x larger than true height)
     //     video/x-raw, format=YV12  -> 8bit, 1 channel (height is 1.5x larger than true height)
     //     video/x-raw, format=I420  -> 8bit, 1 channel (height is 1.5x larger than true height)
+    //     video/x-raw, format=Y16/GRAY16_LE -> 16bit, 1 channel
     //     video/x-bayer             -> 8bit, 1 channel
     //     image/jpeg                -> 8bit, mjpeg: buffer_size x 1 x 1
     // bayer data is never decoded, the user is responsible for that
@@ -351,6 +359,11 @@ bool GStreamerCapture::determineFrameDims(Size &sz)
         else if(strcasecmp(format, "GRAY8") == 0)
         {
             channels = 1;
+        }
+        else if(strcasecmp(format, "GRAY16_LE") == 0)
+        {
+            channels = 1;
+            bits = 16;
         }
     }
     else if (strcasecmp(name, "video/x-bayer") == 0)
@@ -768,14 +781,14 @@ bool GStreamerCapture::open(const String &filename_)
     gst_app_sink_set_emit_signals (GST_APP_SINK(sink), FALSE);
 //    gst_base_sink_set_sync(GST_BASE_SINK(sink), FALSE);
 
-    caps = gst_caps_from_string("video/x-raw, format=(string){BGR, GRAY8}; video/x-bayer,format=(string){rggb,bggr,grbg,gbrg}; image/jpeg");
+    caps = gst_caps_from_string("video/x-raw, format=(string){BGR, GRAY8, GRAY16_LE}; video/x-bayer,format=(string){rggb,bggr,grbg,gbrg}; image/jpeg");
 
     if(manualpipeline){
         GstPad* sink_pad = gst_element_get_static_pad(sink, "sink");
         GstCaps* peer_caps = gst_pad_peer_query_caps(sink_pad,NULL);
         if (!gst_caps_can_intersect(caps, peer_caps)) {
             gst_caps_unref(caps);
-            caps = gst_caps_from_string("video/x-raw, format=(string){UYVY,YUY2,YVYU,NV12,NV21,YV12,I420}");
+            caps = gst_caps_from_string("video/x-raw, format=(string){UYVY,YUY2,YVYU,NV12,NV21,YV12,I420,GRAY16_LE}");
         }
         gst_object_unref(sink_pad);
         gst_caps_unref(peer_caps);
@@ -1844,3 +1857,4 @@ const OpenCV_VideoIO_Plugin_API_preview* opencv_videoio_plugin_init_v0(int reque
 }
 
 #endif // BUILD_PLUGIN
+
