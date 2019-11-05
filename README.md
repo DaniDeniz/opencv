@@ -19,7 +19,7 @@ Please read the [contribution guidelines](https://github.com/opencv/opencv/wiki/
 * Clean up "oops" commits before submitting;
 * Follow the [coding style guide](https://github.com/opencv/opencv/wiki/Coding_Style_Guide).
 
-### Fork of OpenCV 
+### Fork of OpenCV 4.1.0
 * Added Y16 / GRAY16_LE support on VideoCapture with GStreamer
 
 ### Installation Guide with GStreamer
